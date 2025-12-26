@@ -1,0 +1,48 @@
+# --------------------
+# Environment files
+# --------------------
+.env
+
+# --------------------
+# Go build artifacts
+# --------------------
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# --------------------
+# Go tooling
+# --------------------
+/go.work
+/go.work.sum
+
+# --------------------
+# Dependency directories
+# --------------------
+vendor/
+
+# --------------------
+# Logs
+# --------------------
+*.log
+
+# --------------------
+# OS / Editor noise
+# --------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --------------------
+# Docker
+# --------------------
+docker-compose.override.yml
