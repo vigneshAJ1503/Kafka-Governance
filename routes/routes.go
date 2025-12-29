@@ -1,22 +1,21 @@
 package routes
 
 import (
-	"net/http"
-
 	"kafka-governance/api"
 	"kafka-governance/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
-// LoggingMiddleware wraps handlers to log entry and exit points
+func Register(r *gin.Engine) {
+	r.Use(utils.GinLoggingMiddleware())
 
-func Register(mux *http.ServeMux) {
-	apiV1 := http.NewServeMux()
-
-	apiV1.HandleFunc("POST /topics", utils.LoggingMiddleware("POST /api/v1/topics", api.CreateTopic))
-	apiV1.HandleFunc("GET /topics", utils.LoggingMiddleware("GET /api/v1/topics", api.ListTopics))
-	apiV1.HandleFunc("GET /topics/{name}", utils.LoggingMiddleware("GET /api/v1/topics/{name}", api.GetTopic))
-	apiV1.HandleFunc("POST /topics/{name}/approve", utils.LoggingMiddleware("POST /api/v1/topics/{name}/approve", api.ApproveTopic))
-	apiV1.HandleFunc("POST /policies", utils.LoggingMiddleware("POST /api/v1/policies", api.CreatePolicy))
-
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1))
+	v1 := r.Group("/api/v1")
+	{
+		v1.POST("/topics", api.CreateTopic)
+		v1.GET("/topics", api.ListTopics)
+		v1.GET("/topics/:name", api.GetTopic)
+		v1.POST("/topics/:name/approve", api.ApproveTopic)
+		v1.POST("/policies", api.CreatePolicy)
+	}
 }

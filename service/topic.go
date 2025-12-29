@@ -2,31 +2,20 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"kafka-governance/db"
 	"kafka-governance/models"
 	"kafka-governance/utils"
 )
 
-func CreateTopic(ctx context.Context, topic *models.Topic) error {
+func CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error) {
+	response, err := db.CreateTopic(ctx, topic)
 	logger := utils.GetLogger()
-	logger.Info("Processing topic creation request")
-
-	if topic.Name == "" {
-		logger.Error("Topic name validation failed")
-		return errors.New("topic name required")
-	}
-	logger.Debug("Topic validation passed")
-
-	topic.Status = models.TopicPending
-	err := db.CreateTopic(ctx, topic)
 	if err != nil {
 		logger.Error("Topic creation failed at database layer")
-		return err
+		return nil, err
 	}
-	logger.Info("Topic creation completed successfully")
-	return nil
+	return response, nil
 }
 
 func ListTopics(ctx context.Context) ([]models.Topic, error) {

@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 
 	"kafka-governance/config"
 	"kafka-governance/db"
 	"kafka-governance/routes"
 	"kafka-governance/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -38,18 +39,21 @@ func main() {
 	db.InitTopicRepo(database)
 	logger.Info("Topic repository initialized")
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`{"status":"ok"}`))
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	// Health route
+	r.GET("/api/v1/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	routes.Register(mux)
+	routes.Register(r)
 	logger.Info("Routes registered successfully")
 
+	addr := ":" + cfg.AppPort
 	logger.Infof("Server running on port: %s", cfg.AppPort)
-	if err := http.ListenAndServe(":"+cfg.AppPort, mux); err != nil {
+	if err := r.Run(addr); err != nil {
 		logger.Error("Server failed to start")
 		log.Fatal(err)
 	}
 }
-

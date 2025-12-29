@@ -2,9 +2,12 @@ package db
 
 import (
 	"context"
+	"errors"
 	"kafka-governance/models"
 	"kafka-governance/utils"
 	"time"
+
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -68,18 +71,27 @@ func InitTopicRepo(db *mongo.Database) {
 	logger.Info("Topic repository initialized")
 }
 
-func CreateTopic(ctx context.Context, topic *models.Topic) error {
+func CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error) {
 	logger := utils.GetLogger()
 	logger.Debug("Creating topic in database")
 
+	var existingTopic models.Topic
+	err := topicCollection.FindOne(ctx, bson.M{"name": topic.Name}).Decode(&existingTopic)
+	if err == nil {
+		logger.Error("Topic with same name already exists")
+		return nil, errors.New("topic with same name already exists")
+	}
+
+	topic.ID = uuid.New().String()
+
 	topic.CreatedAt = time.Now()
-	_, err := topicCollection.InsertOne(ctx, topic)
+	_, err = topicCollection.InsertOne(ctx, topic)
 	if err != nil {
 		logger.Error("Failed to create topic in database")
-		return err
+		return nil, err
 	}
 	logger.Info("Topic created in database successfully")
-	return nil
+	return topic, nil
 }
 
 func ListTopics(ctx context.Context) ([]models.Topic, error) {

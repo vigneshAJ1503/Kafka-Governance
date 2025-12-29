@@ -3,11 +3,12 @@ package utils
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ANSI color codes
@@ -56,20 +57,6 @@ func InitLoggerWithLevel(level LogLevel) {
 	}
 	logger.Info("Logger initialized")
 }
-func LoggingMiddleware(route string, handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger := log.New(os.Stdout, "", log.LstdFlags)
-		logger.Printf("=============================================")
-		logger.Printf("ENTRY-------------------> %s %s", r.Method, route)
-		logger.Printf("=============================================")
-		defer func() {
-			logger.Printf("=============================================")
-			logger.Printf("EXIT<------------------- %s %s ", r.Method, route)
-			logger.Printf("=============================================")
-		}()
-		handler(w, r)
-	}
-}
 
 // InitLoggerFromConfig initializes the logger and sets log level from environment
 func InitLoggerFromConfig() {
@@ -103,6 +90,26 @@ func InitLoggerFromConfig() {
 func SetLogLevel(level LogLevel) {
 	if logger != nil {
 		logger.logLevel = level
+	}
+}
+
+// GinLoggingMiddleware provides entry/exit logs for Gin handlers
+// Logs method and full route path using the custom logger formatting
+func GinLoggingMiddleware() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		lg := GetLogger()
+		method := c.Request.Method
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+		lg.Infof("ENTRY-------------------> %s %s", method, path)
+		start := time.Now()
+
+		c.Next()
+
+		duration := time.Since(start)
+		lg.Infof("EXIT<------------------- %s %s (%s)", method, path, duration.String())
 	}
 }
 
