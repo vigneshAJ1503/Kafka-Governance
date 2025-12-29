@@ -4,13 +4,19 @@ import (
 	"net/http"
 
 	"kafka-governance/api"
+	"kafka-governance/utils"
 )
 
-func Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /topics", api.CreateTopic)
-	mux.HandleFunc("GET /topics", api.ListTopics)
-	mux.HandleFunc("GET /topics/{name}", api.GetTopic)
-	mux.HandleFunc("POST /topics/{name}/approve", api.ApproveTopic)
+// LoggingMiddleware wraps handlers to log entry and exit points
 
-	mux.HandleFunc("POST /policies", api.CreatePolicy)
+func Register(mux *http.ServeMux) {
+	apiV1 := http.NewServeMux()
+
+	apiV1.HandleFunc("POST /topics", utils.LoggingMiddleware("POST /api/v1/topics", api.CreateTopic))
+	apiV1.HandleFunc("GET /topics", utils.LoggingMiddleware("GET /api/v1/topics", api.ListTopics))
+	apiV1.HandleFunc("GET /topics/{name}", utils.LoggingMiddleware("GET /api/v1/topics/{name}", api.GetTopic))
+	apiV1.HandleFunc("POST /topics/{name}/approve", utils.LoggingMiddleware("POST /api/v1/topics/{name}/approve", api.ApproveTopic))
+	apiV1.HandleFunc("POST /policies", utils.LoggingMiddleware("POST /api/v1/policies", api.CreatePolicy))
+
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiV1))
 }
