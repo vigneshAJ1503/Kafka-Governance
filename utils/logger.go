@@ -5,12 +5,9 @@ import (
 	"os"
 )
 
-var (
-	InfoLogger  *log.Logger
-	ErrorLogger *log.Logger
-)
+var Logger *log.Logger
 
 func InitLogger() {
-	InfoLogger = log.New(os.Stdout, "INFO  ", log.Ldate|log.Ltime|log.Lshortfile)
-	ErrorLogger = log.New(os.Stderr, "ERROR ", log.Ldate|log.Ltime|log.Lshortfile)
+	Logger = log.New(os.Stdout, "[kafka-gov] ", log.LstdFlags|log.Lshortfile)
+	Logger.Println("Logger initialized")
 }

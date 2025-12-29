@@ -1,40 +1,60 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
-	"kafka-governance/config"
 	"kafka-governance/models"
 	"kafka-governance/service"
-	"kafka-governance/utils"
 )
 
 func CreateTopic(w http.ResponseWriter, r *http.Request) {
-	var req models.CreateTopicRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	var topic models.Topic
+	if err := json.NewDecoder(r.Body).Decode(&topic); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	cfg := config.Load()
+	topic.RequestedBy = r.Header.Get("X-User-Id")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	if err := service.CreateTopic(r.Context(), &topic); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	err := service.CreateTopic(ctx, cfg.DBName, models.Topic{
-		Name:       req.Name,
-		Partitions: req.Partitions,
-		Owner:      req.Owner,
-	})
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(topic)
+}
+
+func ListTopics(w http.ResponseWriter, r *http.Request) {
+	topics, err := service.ListTopics(r.Context())
 	if err != nil {
-		utils.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(topics)
+}
+
+func GetTopic(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+
+	topic, err := service.GetTopic(r.Context(), name)
+	if err != nil {
+		http.Error(w, "topic not found", http.StatusNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(topic)
+}
+
+func ApproveTopic(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	admin := r.Header.Get("X-User-Id")
+
+	if err := service.ApproveTopic(r.Context(), name, admin); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	utils.JSON(w, http.StatusCreated, map[string]string{
-		"status": "topic created",
-	})
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"approved"}`))
 }

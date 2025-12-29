@@ -7,36 +7,26 @@ import (
 	"kafka-governance/config"
 	"kafka-governance/db"
 	"kafka-governance/routes"
-	"kafka-governance/utils"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// load .env
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, relying on env vars")
-	}
-
-	// init logger
-	utils.InitLogger()
-	utils.InfoLogger.Println("Starting Kafka Governance Control Plane")
-
-	// load config
 	cfg := config.Load()
 
-	// connect mongo
-	if err := db.Connect(cfg.MongoURI); err != nil {
-		utils.ErrorLogger.Fatalf("MongoDB connection failed: %v", err)
+	client, database, err := db.Connect(cfg.MongoURI)
+	if err != nil {
+		log.Fatal(err)
 	}
-	utils.InfoLogger.Println("Connected to MongoDB")
+	defer client.Disconnect(nil)
 
-	// setup router
-	r := chi.NewRouter()
-	routes.Register(r)
+	db.InitTopicRepo(database)
 
-	// start server
-	utils.InfoLogger.Printf("Server running on :%s", cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	routes.Register(mux)
+
+	log.Println("Server running on :", cfg.AppPort)
+	http.ListenAndServe(":"+cfg.AppPort, mux)
 }

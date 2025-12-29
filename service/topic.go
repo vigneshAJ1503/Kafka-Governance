@@ -2,38 +2,28 @@ package service
 
 import (
 	"context"
-	"time"
+	"errors"
 
 	"kafka-governance/db"
 	"kafka-governance/models"
-	"kafka-governance/utils"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
-func CreateTopic(ctx context.Context, dbName string, topic models.Topic) error {
-	topic.Status = "PENDING"
-	topic.CreatedAt = time.Now()
-
-	utils.InfoLogger.Printf(
-		"Service: creating topic name=%s owner=%s",
-		topic.Name,
-		topic.Owner,
-	)
-
-	collection := db.TopicCollection(dbName)
-
-	_, err := collection.InsertOne(ctx, bson.M{
-		"name":        topic.Name,
-		"partitions":  topic.Partitions,
-		"owner":       topic.Owner,
-		"status":      topic.Status,
-		"created_at":  topic.CreatedAt,
-	})
-	if err != nil {
-		utils.ErrorLogger.Printf("Mongo insert failed: %v", err)
-		return err
+func CreateTopic(ctx context.Context, topic *models.Topic) error {
+	if topic.Name == "" {
+		return errors.New("topic name required")
 	}
+	topic.Status = models.TopicPending
+	return db.CreateTopic(ctx, topic)
+}
 
-	return nil
+func ListTopics(ctx context.Context) ([]models.Topic, error) {
+	return db.ListTopics(ctx)
+}
+
+func GetTopic(ctx context.Context, name string) (*models.Topic, error) {
+	return db.GetTopicByName(ctx, name)
+}
+
+func ApproveTopic(ctx context.Context, name, admin string) error {
+	return db.ApproveTopic(ctx, name, admin)
 }
