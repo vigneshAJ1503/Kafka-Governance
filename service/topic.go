@@ -2,38 +2,57 @@ package service
 
 import (
 	"context"
-	"time"
 
 	"kafka-governance/db"
 	"kafka-governance/models"
 	"kafka-governance/utils"
-
-	"go.mongodb.org/mongo-driver/bson"
 )
 
-func CreateTopic(ctx context.Context, dbName string, topic models.Topic) error {
-	topic.Status = "PENDING"
-	topic.CreatedAt = time.Now()
-
-	utils.InfoLogger.Printf(
-		"Service: creating topic name=%s owner=%s",
-		topic.Name,
-		topic.Owner,
-	)
-
-	collection := db.TopicCollection(dbName)
-
-	_, err := collection.InsertOne(ctx, bson.M{
-		"name":        topic.Name,
-		"partitions":  topic.Partitions,
-		"owner":       topic.Owner,
-		"status":      topic.Status,
-		"created_at":  topic.CreatedAt,
-	})
+func CreateTopic(ctx context.Context, topic *models.Topic) (*models.Topic, error) {
+	response, err := db.CreateTopic(ctx, topic)
+	logger := utils.GetLogger()
 	if err != nil {
-		utils.ErrorLogger.Printf("Mongo insert failed: %v", err)
+		logger.Error("Topic creation failed at database layer")
+		return nil, err
+	}
+	return response, nil
+}
+
+func ListTopics(ctx context.Context) ([]models.Topic, error) {
+	logger := utils.GetLogger()
+	logger.Info("Retrieving topics list")
+
+	topics, err := db.ListTopics(ctx)
+	if err != nil {
+		logger.Error("Failed to retrieve topics list")
+		return nil, err
+	}
+	logger.Infof("Topics list retrieved successfully, count: %d", len(topics))
+	return topics, nil
+}
+
+func GetTopic(ctx context.Context, name string) (*models.Topic, error) {
+	logger := utils.GetLogger()
+	logger.Info("Retrieving topic by name")
+
+	topic, err := db.GetTopicByName(ctx, name)
+	if err != nil {
+		logger.Error("Failed to retrieve topic")
+		return nil, err
+	}
+	logger.Info("Topic retrieved successfully")
+	return topic, nil
+}
+
+func ApproveTopic(ctx context.Context, name, admin string) error {
+	logger := utils.GetLogger()
+	logger.Info("Processing topic approval request")
+
+	err := db.ApproveTopic(ctx, name, admin)
+	if err != nil {
+		logger.Error("Topic approval failed")
 		return err
 	}
-
+	logger.Info("Topic approved successfully")
 	return nil
 }

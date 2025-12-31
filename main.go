@@ -1,42 +1,59 @@
 package main
 
 import (
+	"context"
 	"log"
-	"net/http"
 
 	"kafka-governance/config"
 	"kafka-governance/db"
 	"kafka-governance/routes"
 	"kafka-governance/utils"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// load .env
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, relying on env vars")
-	}
+	// Initialize logger with config from environment
+	utils.InitLoggerFromConfig()
+	logger := utils.GetLogger()
 
-	// init logger
-	utils.InitLogger()
-	utils.InfoLogger.Println("Starting Kafka Governance Control Plane")
+	logger.Info("Starting Kafka Governance application")
 
-	// load config
 	cfg := config.Load()
+	logger.Info("Configuration loaded successfully")
 
-	// connect mongo
-	if err := db.Connect(cfg.MongoURI); err != nil {
-		utils.ErrorLogger.Fatalf("MongoDB connection failed: %v", err)
+	client, database, err := db.Connect(cfg.MongoURI)
+	if err != nil {
+		logger.Error("Failed to connect to database")
+		log.Fatal(err)
 	}
-	utils.InfoLogger.Println("Connected to MongoDB")
+	defer func() {
+		if err := client.Disconnect(context.TODO()); err != nil {
+			logger.Error("Failed to disconnect from database")
+			log.Fatal(err)
+		}
+	}()
 
-	// setup router
-	r := chi.NewRouter()
+	logger.Info("Database connection established")
+
+	db.InitTopicRepo(database)
+	logger.Info("Topic repository initialized")
+
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	// Health route
+	r.GET("/api/v1/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	routes.Register(r)
+	logger.Info("Routes registered successfully")
 
-	// start server
-	utils.InfoLogger.Printf("Server running on :%s", cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))
+	addr := ":" + cfg.AppPort
+	logger.Infof("Server running on port: %s", cfg.AppPort)
+	if err := r.Run(addr); err != nil {
+		logger.Error("Server failed to start")
+		log.Fatal(err)
+	}
 }
