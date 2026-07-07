@@ -43,6 +43,13 @@ services:
       - "8180:8180"
     restart: unless-stopped
 
+  redis:
+    image: redis:7.0-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   mongodb:
     image: mongo:6.0
     container_name: mongodb
@@ -60,10 +67,12 @@ services:
     environment:
       - MONGO_URI=mongodb://mongodb:27017
       - CEDAR_URL=http://cedar:8180
+      - REDIS_URL=redis:6379
       - JWT_SECRET=superSecretKey
     depends_on:
       - mongodb
       - cedar
+      - redis
     restart: unless-stopped
 
   ui:

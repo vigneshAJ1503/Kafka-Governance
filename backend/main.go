@@ -6,6 +6,7 @@ import (
 
 	"kafka-governance/config"
 	"kafka-governance/db"
+	"kafka-governance/cache"
 	"kafka-governance/routes"
 	"kafka-governance/utils"
 
@@ -17,16 +18,20 @@ func main() {
 	utils.InitLoggerFromConfig()
 	logger := utils.GetLogger()
 
-	logger.Info("Starting Kafka Governance application")
-
 	cfg := config.Load()
 	logger.Info("Configuration loaded successfully")
 
 	client, database, err := db.Connect(cfg.MongoURI)
 	if err != nil {
-		logger.Error("Failed to connect to database")
-		log.Fatal(err)
+		logger.Errorf("Failed to connect to MongoDB: %v", err)
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
+
+	if err := cache.InitRedis(); err != nil {
+		logger.Errorf("Failed to connect to Redis: %v", err)
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+
 	defer func() {
 		if err := client.Disconnect(context.TODO()); err != nil {
 			logger.Error("Failed to disconnect from database")

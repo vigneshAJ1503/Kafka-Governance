@@ -9,6 +9,9 @@ RUN go mod download
 # Copy source
 COPY . .
 
+# Explicitly Tidy mods to embed missing references organically imported above like go-redis
+RUN go mod tidy
+
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o kafka-governance .
 
