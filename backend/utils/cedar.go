@@ -2,10 +2,14 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"time"
 
+	"kafka-governance/cache"
 	"kafka-governance/config"
 )
 
@@ -16,9 +20,26 @@ type CedarAuthRequest struct {
 	Context   map[string]interface{} `json:"context,omitempty"`
 }
 
+// Cache TTL mapped for policy evaluations to prevent hitting Cedar heavily under high load.
+const PolicyCacheTTL = 5 * time.Minute
+
+// EvaluatePolicy evaluates Cedar policy constraints securely, pulling cached records sequentially.
 func EvaluatePolicy(principal, action, resource string) (bool, error) {
 	logger := GetLogger()
+	ctx := context.Background()
 	cfg := config.Load()
+
+	// Construct cache key mapping the precise identity & resource constraints
+	cacheKey := fmt.Sprintf("cedar_policy:%s:%s:%s", principal, action, resource)
+
+	// 1. Try resolving securely via standard Redis Caching lookup bounds
+	if cache.RedisClient != nil {
+		cachedResult, err := cache.RedisClient.Get(ctx, cacheKey).Result()
+		if err == nil {
+			logger.Infof("⚡ Cache Hit: Resolved Cedar policy from Redis -> %s", cachedResult)
+			return cachedResult == "true", nil
+		}
+	}
 
 	// In a complete implementation, policies would be sent from DB or synced to the agent.
 	// We'll perform an API call assuming the agent has the policy or doesn't mandate it for permit tests.
@@ -50,6 +71,17 @@ func EvaluatePolicy(principal, action, resource string) (bool, error) {
 		return false, fmt.Errorf("cedar evaluation failed with status %d", resp.StatusCode)
 	}
 
-	logger.Info("Cedar Policy evaluation permissive")
-	return true, nil
+	body, _ := io.ReadAll(resp.Body)
+	isAllowed := string(body) == "true"
+	logger.Infof("Cedar policy assessment complete: %v", isAllowed)
+
+	// 2. Set the resolution to Cache asynchronously targeting our specific TTL boundary mapping safely
+	if cache.RedisClient != nil {
+		err := cache.RedisClient.Set(ctx, cacheKey, fmt.Sprintf("%v", isAllowed), PolicyCacheTTL).Err()
+		if err != nil {
+			logger.Warnf("Failed to store evaluation payload natively to cache: %v", err)
+		}
+	}
+
+	return isAllowed, nil
 }
